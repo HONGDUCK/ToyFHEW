@@ -1,8 +1,6 @@
 import numpy as np
-from numpy.polynomial import Polynomial
 from include.core import CRTRq
 from include.core.ModuliChainGen import generate_pairwise_coprime
-from math import prod
 
 if __name__ == '__main__':
     n = 8  # power of 2
@@ -32,4 +30,3 @@ if __name__ == '__main__':
     CRTRq.fast_basis_conversion(m0, moduli_chain2)
 
     print(m0)
-

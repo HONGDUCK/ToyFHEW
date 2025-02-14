@@ -96,11 +96,9 @@ class RLWE:
 
         return c
 
-
 def discrete_gaussian(n, q, mean=0., std=1.):
     coeffs = np.round(std * np.random.randn(n))
     return Rq(coeffs, q)
-
 
 def discrete_uniform(n, q, min=0., max=None):
     if max is None:

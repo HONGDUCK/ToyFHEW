@@ -1,4 +1,4 @@
-from note_include.Ring  import Ring
+from note_include.elem.Ring  import Ring
 from typing import List, Tuple, TypeAlias
 
 RLWEctxt : TypeAlias = Tuple[Ring, Ring]

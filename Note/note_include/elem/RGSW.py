@@ -1,7 +1,7 @@
 import numpy as np
-from note_include.Ring  import Ring
-from note_include.RLWE  import RLWE
-from note_include.RLWEp import RLWEp
+from note_include.elem.Ring  import Ring
+from note_include.elem.RLWE  import RLWE
+from note_include.elem.RLWEp import RLWEp
 from note_include.utils.types import RGSWctxt, RLWEctxt
 
 class RGSW:

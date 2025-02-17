@@ -1,6 +1,6 @@
 import numpy as np
-from note_include.RLWE import RLWE
-from note_include.Ring import Ring
+from note_include.elem.RLWE import RLWE
+from note_include.elem.Ring import Ring
 from note_include.utils.gadget_decomposition import gadget_decomposition
 from note_include.utils.types import RLWEpctxt, RLWEctxt
 

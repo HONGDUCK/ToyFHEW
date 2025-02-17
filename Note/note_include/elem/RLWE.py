@@ -1,4 +1,4 @@
-from note_include.Ring import Ring
+from note_include.elem.Ring import Ring
 from note_include.utils.noise_generator import discrete_gaussian, discrete_uniform
 from note_include.utils.types import RLWEctxt
 

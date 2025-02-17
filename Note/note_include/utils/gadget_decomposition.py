@@ -1,5 +1,5 @@
 import numpy as np
-from note_include.Ring import Ring
+from note_include.elem.Ring import Ring
 # from note_include.utils.types import RGSWctxt, RLWEctxt, RLWEpctxt
 
 def gadget_decomposition(poly : Ring, B : int, d : int) -> list[Ring]:

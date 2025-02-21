@@ -1,5 +1,127 @@
 import numpy as np
 
+class Ring:
+    '''
+        ring : Zq[x]/(x^n+1)
+    '''
+    def __init__(self, dimension, modulus, coeffs):
+        self.n = dimension
+        self.q = modulus
+        self.coeffs = [coeff % modulus for coeff in coeffs]
+        divisor = np.zeros((dimension+1), dtype=np.int64)  # x^n + 1
+        divisor[0] = divisor[-1] = 1
+        self.divisor = divisor
+        # self.inv_n, self.roots, self.omega, self.omega_inv = nth_roots_of_unity(dimension, modulus)
+
+    def pad_coeffs(self, coeffs):
+        """Pads coeffs with zeros to length n if necessary."""
+        if len(coeffs) < self.n:
+            return np.pad(coeffs, (0, self.n - len(coeffs)), 'constant')
+        return coeffs
+
+    def NTT_like_PWC(self, other):
+        assert self.omega == other.omega
+        assert self.omega_inv == other.omega_inv
+        assert self.q == other.q
+        assert self.n == other.n
+
+        ntt_poly1 = self.positive_wrapped_ntt(self.coeffs, self.omega, self.q, self.n)
+        ntt_poly2 = self.positive_wrapped_ntt(other.coeffs, other.omega, other.q, other.n)
+
+        ntt_res = np.zeros(self.n)
+        for i in range(self.n):
+            ntt_res[i] = (ntt_poly1[i] * ntt_poly2[i]) % self.q
+
+        poly_nega_conv = self.positive_wrapped_intt(ntt_res, self.omega_inv, self.q, self.n, self.inv_n)
+        return Ring(self.n, self.q, poly_nega_conv)
+
+    # def negative_ring_mult_q(self, other):
+    #     assert self.q == other.q
+    #     assert self.n == other.n # !! watchout
+        
+    #     prod = np.polymul(self.coeffs[::-1], other.coeffs[::-1])
+    #     _, r = np.polydiv(prod, self.divisor)
+    #     r = np.mod(r, self.q)
+
+    #     return Ring(self.n, self.q, r[::-1])
+    
+    def negative_ring_mult_q(self, other):
+        result = []
+        poly1 = self.pad_coeffs(self.coeffs)
+        poly2 = self.pad_coeffs(other.coeffs)
+        # poly1 = self.coeffs[::-1]
+        # poly2 = self.coeffs[::-1]
+        for k in range(self.n):
+            v = 0
+            for i in range(k+1):
+                v += poly1[i] * poly2[k-i]
+            for i in range(k+1, self.n):
+                v -= poly1[i] * poly2[(k + self.n - i)]
+
+            result.append(v)
+        return Ring(self.n, self.q, result)
+    
+    def ring_add_q(self, other):
+        assert self.q == other.q
+        assert self.n == other.n
+
+        add_coeffs = [int((a + b) % self.q) for a,b in zip(self.coeffs, other.coeffs)]
+        return Ring(self.n, self.q, add_coeffs)
+    
+    def ring_sub_q(self, other):
+        assert self.q == other.q
+        assert self.n == other.n
+
+        sub_coeffs = [int((a - b) % self.q) for a,b in zip(self.coeffs, other.coeffs)]
+        return Ring(self.n, self.q, sub_coeffs)
+
+    def __mul__(self, other):
+        return self.negative_ring_mult_q(other)
+    
+    def __rmul__(self, integer : int):
+        coeffs = [(c * integer) % self.q for c in self.coeffs]
+        return Ring(self.n, self.q, coeffs)
+    
+    def __mod__(self, integer):
+        coeffs = [co % integer for co in self.coeffs]
+        return Ring(self.n, self.q, coeffs)
+    
+    def __add__(self, other):
+        return self.ring_add_q(other)
+    
+    def __sub__(self, other):
+        return self.ring_sub_q(other)
+
+    def __repr__(self, spilt=False):
+        terms = []
+        for i, coef in enumerate(self.coeffs):
+            # if coef != 0:
+                if i == 0:
+                    terms.append(f"{coef}")
+                elif i == 1:
+                    terms.append(f"{coef}x")
+                else:
+                    terms.append(f"{coef}x^{i}")
+    
+        poly_str = " + ".join(terms) if terms else "0"
+    
+        # Split into two lines
+        if spilt == True:
+            mid = len(terms) // 2  # Find the middle index
+            first_half = " + ".join(terms[:mid])
+            second_half = " + ".join(reversed(terms[mid:]))
+            second_half = " + ".join(terms[mid:])
+            return f"R(n={self.n}, q={self.q}, coeffs=\n  {first_half}\n  {second_half})"
+    
+        else:
+            return f"R(n={self.n}, q={self.q}, coeffs= {poly_str})"
+
+    def __getitem__(self, index):
+        return self.coeffs[index]  # Allow indexing into the coefficient array
+    
+
+
+
 def mod_inverse(a, m):
     """Compute the modular inverse of a modulo m using the Extended Euclidean Algorithm."""
     m0 = m
@@ -113,100 +235,3 @@ def positive_wrapped_intt(hat_a, omega_inv, q, n, n_inv):
         a[i] = (n_inv * summation) % q
             
     return a
-
-
-class Ring:
-    '''
-        ring : Zq[x]/(x^n+1)
-    '''
-    def __init__(self, dimension, modulus, coeffs):
-        self.n = dimension
-        self.q = modulus
-        self.coeffs = coeffs
-        divisor = np.zeros((dimension+1), dtype=np.int64)  # x^n + 1
-        divisor[0] = divisor[-1] = 1
-        self.divisor = divisor
-        self.inv_n, self.roots, self.omega, self.omega_inv = nth_roots_of_unity(dimension, modulus)
-        
-    def NTT_like_PWC(self, other):
-        assert self.omega == other.omega
-        assert self.omega_inv == other.omega_inv
-        assert self.q == other.q
-        assert self.n == other.n
-
-        ntt_poly1 = self.positive_wrapped_ntt(self.coeffs, self.omega, self.q, self.n)
-        ntt_poly2 = self.positive_wrapped_ntt(other.coeffs, other.omega, other.q, other.n)
-
-        ntt_res = np.zeros(self.n)
-        for i in range(self.n):
-            ntt_res[i] = (ntt_poly1[i] * ntt_poly2[i]) % self.q
-
-        poly_nega_conv = self.positive_wrapped_intt(ntt_res, self.omega_inv, self.q, self.n, self.inv_n)
-        return Ring(self.n, self.q, poly_nega_conv)
-
-    def negative_ring_mult_q(self, other):
-        assert self.q == other.q
-        assert self.n == other.n
-        
-        prod = np.polymul(self.coeffs[::-1], other.coeffs[::-1])
-        qq, r = np.polydiv(prod, self.divisor)
-        r = np.mod(r, self.q)
-        r = np.pad(r, (0, self.n - len(r)), mode='constant') if len(r) < self.n else r
-        return Ring(self.n, self.q, r[::-1])
-    
-    def ring_add_q(self, other):
-        assert self.q == other.q
-        assert self.n == other.n
-
-        add_coeffs = [(a + b) % self.q for a,b in zip(self.coeffs, other.coeffs)]
-        return Ring(self.n, self.q, add_coeffs)
-    
-    def ring_sub_q(self, other):
-        assert self.q == other.q
-        assert self.n == other.n
-
-        add_coeffs = [(a - b) % self.q for a,b in zip(self.coeffs, other.coeffs)]
-        return Ring(self.n, self.q, add_coeffs)
-
-    def __mul__(self, other):
-        return self.negative_ring_mult_q(other)
-    
-    def __rmul__(self, integer : int):
-        coeffs = [(c * integer) % self.q for c in self.coeffs]
-        return Ring(self.n, self.q, coeffs)
-    
-    def __mod__(self, integer):
-        self.coeffs = [co % integer for co in self.coeffs]
-    
-    def __add__(self, other):
-        return self.ring_add_q(other)
-    
-    def __sub__(self, other):
-        return self.ring_sub_q(other)
-
-    def __repr__(self, spilt=False):
-        terms = []
-        for i, coef in enumerate(self.coeffs):
-            # if coef != 0:
-                if i == 0:
-                    terms.append(f"{coef}")
-                elif i == 1:
-                    terms.append(f"{coef}x")
-                else:
-                    terms.append(f"{coef}x^{i}")
-    
-        poly_str = " + ".join(terms) if terms else "0"
-    
-        # Split into two lines
-        if spilt == True:
-            mid = len(terms) // 2  # Find the middle index
-            first_half = " + ".join(terms[:mid])
-            second_half = " + ".join(reversed(terms[mid:]))
-            second_half = " + ".join(terms[mid:])
-            return f"R(n={self.n}, q={self.q}, coeffs=\n  {first_half}\n  {second_half})"
-    
-        else:
-            return f"R(n={self.n}, q={self.q}, coeffs= {poly_str})"
-
-    def __getitem__(self, index):
-        return self.coeffs[index]  # Allow indexing into the coefficient array

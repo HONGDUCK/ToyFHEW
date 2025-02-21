@@ -24,3 +24,12 @@ def gadget_composition(decomposed: list[Ring], B: int, modulus: int) -> Ring:
 
 def format_ring_list(ring_list):
     return "\n".join(repr(ring) for ring in ring_list)
+
+def gadget_decomposition_int(v:int, B : int, d : int) -> list[int]:
+    decomposed = []
+    for _ in range(d):  # Decompose into d components
+        remainder = v % B  # Get the lowest base-B component
+        v = v // B  # Reduce the coefficients
+        decomposed.append(remainder)  # Store decomposition step
+
+    return decomposed  # Return vector of polynomials

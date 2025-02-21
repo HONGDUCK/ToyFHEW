@@ -20,16 +20,25 @@ class RLWE:
     
     # Only for symmetric encryption
     def encrypt(self, msg : Ring, sk : Ring) -> RLWEctxt:
-        e = discrete_gaussian(self.n, self.q, std=self.std) # Noise
-        a = discrete_uniform(self.n, self.q)                # Random Num
+        # e = discrete_gaussian(self.n, self.q, std=self.std) # Noise
+        e = discrete_gaussian(self.n, self.q, mean = 0, std = 0) # Noise
+        a = discrete_uniform(self.n, self.q, 0, self.q)                # Random Num
+
 
         b = a * sk + msg + e
 
+        # print("in rlwe encrypt msg : ", msg)
+        # print("in rlwe encrypt e   : ", e)
+        # print("in rlwe encrypt a   : ", a)
+        # print("in rlwe encrypt b   : ", b)
+
+        # print("")
+
         return (a, b)
     
-    def decrypt(self, ctxt : Ring, sk : Ring):
+    def decrypt(self, ctxt : RLWEctxt, sk : Ring) -> Ring:
         a, b = ctxt
-        return b - a * sk
+        return b - (a * sk)
     
     def add_ctxt_ctxt(self, ct1 : RLWEctxt, ct2 : RLWEctxt) -> RLWEctxt:
         a1, b1 = ct1

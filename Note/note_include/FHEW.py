@@ -10,26 +10,37 @@ from joblib import Parallel, delayed
 def generate_rgsw_row(v, B, d_g, _s, q, N, Q, RGSW_CC, s_ring):
     row = []
     for j in range(d_g):
-        _as = (v * (B**j) * _s) % q
-        _as = int((((_as % q) + q) % q) * (2 * (N) / q))
+        _as = int((v * (B**j) * _s) % q)
 
         reduced = False
-        if (_as >= 2*N) :
-            _as -= 2*N
+        if (_as >= N) :
+            _as -= N
             reduced = True
+
+        if _as == 0 and reduced == True:
+            monomial = np.zeros(N)
+            monomial[0] = -1
+            monomial = Ring(N, Q, monomial)
+            row.append(RGSW_CC.encrypt(monomial, s_ring))
+            continue
+
+        elif _as == 0 and reduced == False:
+            monomial = np.zeros(N)
+            monomial[0] = 1
+            monomial = Ring(N, Q, monomial)
+            row.append(RGSW_CC.encrypt(monomial, s_ring))
+            continue
 
         if reduced == False:
             monomial = np.zeros(N)
-            monomial[int((2*N)-(_as))] = 1
+            monomial[(N)-(_as)] = -1
             monomial = Ring(N, Q, monomial)
-            # monomial = monomial * xn
         else:
             monomial = np.zeros(N)
-            monomial[int((2*N)-(_as))] = 1
+            monomial[(N)-(_as)] = 1
             monomial = Ring(N, Q, monomial)
 
-        poly = Ring(N, Q, monomial)
-        row.append(RGSW_CC.encrypt(poly, s_ring))
+        row.append(RGSW_CC.encrypt(monomial, s_ring))
     return row
 
 def generate_rgsw_matrix(_s, B, d_g, q, N, Q, RGSW_CC, s_ring):
@@ -64,9 +75,10 @@ class FHEW:
     # -------------------------------- KeyGen ---------------------------- #
     def dm_keygen(self): # Further impl
         s              = self.LWE_CC.keygen()
-        s_ring, _      = self.RLWE_CC.keygen()
+        s_ring,pk_ring = self.RLWE_CC.keygen()
         self.brk       = self.dm_like_rgsw_keygen(s, s_ring)
         self.ksk       = self.KSKgen(s, s_ring)
+        self.pk        = pk_ring
 
         return s, s_ring
     
@@ -122,33 +134,23 @@ class FHEW:
 
     def acc_init(self, ctxt:LWEctxt, gate = "AND") -> RLWEctxt:
         _, b = ctxt
-        q0, q1, q2, q3 = mapping_function(self.q, gate)
+        # q0, q1, q2, q3 = mapping_function(self.q, gate)
+        # For now, its only for AND gate operation
 
-        # it should be satisfy 2q = N
-        # assert self.q * 2 == self.N
         acc = np.zeros(self.N)
+    
+        for i in range(self.q//2):
+            b = (b - 1) % self.q
+    
+            if b >= ((3 * self.q) // 8) and b < ((7 * self.q) // 8):
+                acc[i] = self.Q // 8
+            else :
+                acc[i] = (-self.Q // 8) % self.Q
+    
+        poly_acc = Ring(self.N, self.Q, acc)
+        acc = self.RLWE_CC.pk_encrypt(poly_acc, self.pk)
 
-        for i in range(self.N // 2):
-            b_ = (b - (i * 4)) % self.q
-            if q0 < q1:
-                if q0 <= b_ and b_ < q1:
-                    b_ = self.q // 8
-                else:
-                    b_ = (-self.q // 8) % self.q
-            elif q2 < q3:
-                if q2 <= b_ and b_ < q3:
-                    b_ = self.q // 8
-                else:
-                    b_ = (-self.q // 8) % self.q                
-            
-            acc[i] = b_
-            acc[i + (self.N//2)] = (-b_) % self.q
-
-        # noiseless encryption
-        poly_acc  = Ring(self.N, self.Q, acc)
-        poly_zero = Ring(self.N, self.Q, np.zeros(self.N))
-
-        return(poly_zero, poly_acc)
+        return acc
     
     # ------------------------------------------------------------------- #
 
@@ -181,7 +183,7 @@ class FHEW:
     
     def LWEextract(self, ctxt:RLWEctxt) -> LWEctxt:
         a, b = ctxt
-        b_0  = int(b.coeffs[0])                                                 # extract constant term
+        b_0  = int(b.coeffs[0] + (self.Q // 8))                                                 # extract constant term
         a_coeffs = [a.coeffs[0]] + [(-x) % a.q for x in reversed(a.coeffs[1:])] # suit for negacyclic works
 
         return (a_coeffs, b_0)
@@ -214,9 +216,9 @@ class FHEW:
         key_switched_lwe = self.KeySwitch(extracted_lwe)
 
         # ModSwitch
-        mod_switched_lwe = self.ModSwitch(key_switched_lwe)
+        # mod_switched_lwe = self.ModSwitch(key_switched_lwe)
 
-        return mod_switched_lwe
+        return key_switched_lwe
     
 def mapping_function(q:int, gate = "AND"):
     assert gate == "AND" or gate == "OR" or gate == "XOR" or gate == "NAND" or gate == "NOR" or gate == "XNOR", "Gate should be one of [AND, OR, XOR, NAND, NOR, XNOR]."

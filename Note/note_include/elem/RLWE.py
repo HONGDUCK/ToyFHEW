@@ -13,8 +13,8 @@ class RLWE:
         s = discrete_gaussian(self.n, self.q, std=3.2)     # default
         e = discrete_gaussian(self.n, self.q, std=self.std)
 
-        a1 = discrete_uniform(self.n, self.q)
-        a0 = -1 * (a1 * s + e)
+        a0 = discrete_uniform(self.n, self.q)
+        a1 = (a0 * s + e)
 
         return (s, (a0, a1)) # (secret key, public key)
     
@@ -26,15 +26,11 @@ class RLWE:
 
 
         b = a * sk + msg + e
-
-        # print("in rlwe encrypt msg : ", msg)
-        # print("in rlwe encrypt e   : ", e)
-        # print("in rlwe encrypt a   : ", a)
-        # print("in rlwe encrypt b   : ", b)
-
-        # print("")
-
         return (a, b)
+    
+    def pk_encrypt(self, msg:Ring, pk:RLWEctxt) -> RLWEctxt:
+        a0, a1 = pk
+        return (a0, a1 + msg)
     
     def decrypt(self, ctxt : RLWEctxt, sk : Ring) -> Ring:
         a, b = ctxt

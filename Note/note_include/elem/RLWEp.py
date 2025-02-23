@@ -54,9 +54,6 @@ class RLWEp:
         
         for ctxt, d_poly in zip(ctxts, decomposed_polys):
             if all(c == 0 for c in d_poly.coeffs):continue
-            # if d_poly.coeffs[0] != 0 and all(c == 0 for c in d_poly.coeffs[1:]):
-                # result = self.CCrlwe.add_ctxt_ctxt(result, self.CCrlwe.mult_ring_cnst(ctxt, d_poly.coeffs[0]))
-            # else:
             tmp = result
             result = self.CCrlwe.add_ctxt_ctxt(tmp, self.CCrlwe.mult_ring_ptxt(ctxt, d_poly))
         

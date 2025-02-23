@@ -134,19 +134,34 @@ class FHEW:
 
     def acc_init(self, ctxt:LWEctxt, gate = "AND") -> RLWEctxt:
         _, b = ctxt
-        # q0, q1, q2, q3 = mapping_function(self.q, gate)
-        # For now, its only for AND gate operation
+        q0, q1, q2, q3 = mapping_function(self.q, gate)
+
+        swap1 = False
+        swap2 = False
+        if q0 > q1 : swap1 = True
+        if q2 > q3 : swap2 = True    
 
         acc = np.zeros(self.N)
-    
+
         for i in range(self.q//2):
             b = (b - 1) % self.q
-    
-            if b >= ((3 * self.q) // 8) and b < ((7 * self.q) // 8):
-                acc[i] = self.Q // 8
-            else :
-                acc[i] = (-self.Q // 8) % self.Q
-    
+
+            if swap1 == False:
+                if b >= q0 and b < q1:
+                    acc[i] = self.Q // 8
+            
+            elif swap1 == True:
+                if b > q0 or b <= q1:
+                    acc[i] = self.Q // 8
+
+            if swap2 == False:
+                if b >= q2 and b < q3:
+                    acc[i] = -self.Q // 8
+            
+            elif swap2 == True:
+                if b > q2 or b <= q3:
+                    acc[i] = -self.Q // 8
+            
         poly_acc = Ring(self.N, self.Q, acc)
         acc = self.RLWE_CC.pk_encrypt(poly_acc, self.pk)
 
@@ -219,6 +234,13 @@ class FHEW:
         # mod_switched_lwe = self.ModSwitch(key_switched_lwe)
 
         return key_switched_lwe
+    
+    def evalNOT(self, ct:LWEctxt) -> LWEctxt:
+        a, b = ct
+        b_   = b - self.q//4
+        a_   = [int(-aa % self.q )for aa in a]
+
+        return (a_, -b_)
     
 def mapping_function(q:int, gate = "AND"):
     assert gate == "AND" or gate == "OR" or gate == "XOR" or gate == "NAND" or gate == "NOR" or gate == "XNOR", "Gate should be one of [AND, OR, XOR, NAND, NOR, XNOR]."

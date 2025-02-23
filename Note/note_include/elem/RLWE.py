@@ -18,12 +18,10 @@ class RLWE:
 
         return (s, (a0, a1)) # (secret key, public key)
     
-    # Only for symmetric encryption
     def encrypt(self, msg : Ring, sk : Ring) -> RLWEctxt:
-        # e = discrete_gaussian(self.n, self.q, std=self.std) # Noise
-        e = discrete_gaussian(self.n, self.q, mean = 0, std = 0) # Noise
+        e = discrete_gaussian(self.n, self.q, std=self.std) # Noise
+        # e = discrete_gaussian(self.n, self.q, mean = 0, std = 0) # Noiseless
         a = discrete_uniform(self.n, self.q, 0, self.q)                # Random Num
-
 
         b = a * sk + msg + e
         return (a, b)

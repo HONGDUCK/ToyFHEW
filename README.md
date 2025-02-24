@@ -1,3 +1,2 @@
-```
-pip install -e .
-```
+# Beginner guide and toy code implementation of Fully Homomorphic Encryption : FHEW (Korean)
+

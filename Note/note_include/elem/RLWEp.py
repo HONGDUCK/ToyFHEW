@@ -5,14 +5,21 @@ from note_include.utils.gadget_decomposition import gadget_decomposition, format
 from note_include.utils.types import RLWEpctxt, RLWEctxt
 
 class RLWEp:
-    def __init__(self, dimension, modulus, std, base, d):
-        self.n   = dimension
-        self.q   = modulus
-        self.std = std
-        self.B   = base
-        # self.d   = int(np.ceil(np.log(modulus) / np.log(base)))
-        self.d   = d
-        self.CCrlwe = RLWE(dimension, modulus, std)
+    def __init__(self, 
+                 dimension, 
+                 modulus, 
+                 s_std,
+                 e_std, 
+                 base, 
+                 d):
+        
+        self.n      = dimension
+        self.q      = modulus
+        self.s_std  = s_std
+        self.e_std  = e_std
+        self.B      = base
+        self.d      = d
+        self.CCrlwe = RLWE(dimension, modulus, s_std, e_std)
 
     def encrypt(self, msg : Ring, sk : Ring) -> RLWEpctxt:
         ctxts = []

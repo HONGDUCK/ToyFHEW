@@ -3,25 +3,29 @@ from note_include.utils.noise_generator import discrete_gaussian, discrete_unifo
 from note_include.utils.types import RLWEctxt
 
 class RLWE:
-    def __init__(self, dimension, modulus, std):
+    def __init__(self, dimension, modulus, s_std, e_std):
         # assert np.log2(dimension) == int(np.log2(dimension)) # power-of-two dimension
-        self.n   = dimension
-        self.q   = modulus
-        self.std = std
+        self.n     = dimension
+        self.q     = modulus
+        self.s_std = s_std
+        self.e_std = e_std
 
     def keygen(self):
-        s = discrete_gaussian(self.n, self.q, std=3.2)     # default
-        e = discrete_gaussian(self.n, self.q, std=self.std)
+        if self.s_std == "Gaussian":
+            s = discrete_gaussian(self.n, self.q, std=3.2)     # default
+        elif self.s_std == "Binary":
+            s = discrete_uniform(self.n, self.q, 0, 2)
+            
+        e = discrete_gaussian(self.n, self.q, self.e_std)
 
         a0 = discrete_uniform(self.n, self.q)
         a1 = (a0 * s + e)
 
         return (s, (a0, a1)) # (secret key, public key)
     
-    def encrypt(self, msg : Ring, sk : Ring) -> RLWEctxt:
-        e = discrete_gaussian(self.n, self.q, std=self.std) # Noise
-        # e = discrete_gaussian(self.n, self.q, mean = 0, std = 0) # Noiseless
-        a = discrete_uniform(self.n, self.q, 0, self.q)                # Random Num
+    def encrypt(self, msg : Ring, sk:Ring) -> RLWEctxt:
+        e = discrete_gaussian(self.n, self.q, std=self.e_std) # Noise
+        a = discrete_uniform(self.n, self.q)       # Random Num
 
         b = a * sk + msg + e
         return (a, b)

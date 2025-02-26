@@ -10,7 +10,7 @@ class Ring:
     def __init__(self, dimension, modulus, coeffs):
         self.n = dimension
         self.q = modulus
-        self.coeffs = [int(coeff % modulus) for coeff in coeffs]
+        self.coeffs = [int(coeff % self.q) for coeff in coeffs]
 
     def nega_conv(self, other):
         result = []

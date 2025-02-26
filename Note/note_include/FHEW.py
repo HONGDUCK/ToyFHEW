@@ -1,109 +1,67 @@
 import numpy as np
-from note_include.elem.Ring   import Ring
-from note_include.elem.LWE    import LWE
-from note_include.elem.RLWE   import RLWE
-from note_include.elem.RLWEp  import RLWEp
-from note_include.elem.RGSW   import RGSW
-from note_include.utils.types import RGSWctxt, RLWEctxt, RLWEpctxt, LWEctxt
+from note_include.elem.Ring           import Ring
+from note_include.elem.LWE            import LWE
+from note_include.elem.RLWE           import RLWE
+from note_include.elem.RLWEp          import RLWEp
+from note_include.elem.RGSW           import RGSW
+from note_include.utils.types         import RGSWctxt, RLWEctxt, RLWEpctxt, LWEctxt
+from note_include.blindrotations.DM   import DM
+from note_include.blindrotations.CGGI import CGGI
 from joblib import Parallel, delayed
-
-def generate_rgsw_row(v, B, d_g, _s, q, N, Q, RGSW_CC, s_ring):
-    row = []
-    for j in range(d_g):
-        _as = int((v * (B**j) * _s) % q)
-
-        reduced = False
-        if (_as >= N) :
-            _as -= N
-            reduced = True
-
-        if _as == 0 and reduced == True:
-            monomial = np.zeros(N)
-            monomial[0] = -1
-            monomial = Ring(N, Q, monomial)
-            row.append(RGSW_CC.encrypt(monomial, s_ring))
-            continue
-
-        elif _as == 0 and reduced == False:
-            monomial = np.zeros(N)
-            monomial[0] = 1
-            monomial = Ring(N, Q, monomial)
-            row.append(RGSW_CC.encrypt(monomial, s_ring))
-            continue
-
-        if reduced == False:
-            monomial = np.zeros(N)
-            monomial[(N)-(_as)] = -1
-            monomial = Ring(N, Q, monomial)
-        else:
-            monomial = np.zeros(N)
-            monomial[(N)-(_as)] = 1
-            monomial = Ring(N, Q, monomial)
-
-        row.append(RGSW_CC.encrypt(monomial, s_ring))
-    return row
-
-def generate_rgsw_matrix(_s, B, d_g, q, N, Q, RGSW_CC, s_ring):
-    return Parallel(n_jobs=-1)(
-        delayed(generate_rgsw_row)(v, B, d_g, _s, q, N, Q, RGSW_CC, s_ring)
-        for v in range(B)
-    )
 
 class FHEW:
     # Method -> DM, CGGI, LMKCDEY
-    def __init__(self, lwe_dimension, lwe_modulus, dimension, modulus, std, base_gd, base_ks, method = 'DM'):
+    def __init__(self, lwe_dimension, 
+                       lwe_modulus, 
+                       dimension, 
+                       modulus, 
+                       s_std, 
+                       e_std, 
+                       base_gd, 
+                       base_ks, 
+                       method = 'DM'):
+        
         # it should be satisfy q = 2N
-        # assert lwe_modulus * 2 == dimension
+        assert lwe_modulus == dimension * 2
+        assert method == "DM" or method == "CGGI" or method == "LMKCDEY", "Method should be one of [DM, CGGI, LMKCDEY]."
+        assert s_std == "Gaussian" or s_std == "Binary", "Secret key distribution should be one of [Gaussian, Binary]."
+        
+        if method == "CGGI":
+            assert method == "CGGI" and s_std == "Binary", "We impl CGGI blind rotation only for binary key distribution."
+
         self.n        = lwe_dimension
         self.q        = lwe_modulus
         self.N        = dimension
         self.Q        = modulus
-        self.std      = std
+        self.s_std    = s_std
+        self.e_std    = e_std
         self.B        = base_gd
         self.d_g      = int(np.ceil(np.log(lwe_modulus) / np.log(base_gd)))
         self.B_ks     = base_ks
         self.d_ks     = int(np.ceil(np.log(modulus) / np.log(base_ks)))
 
-        self.LWE_CC   = LWE  (lwe_dimension, lwe_modulus, std)
-        self.LWEQ_CC  = LWE  (lwe_dimension, modulus,     std)
-        self.RLWE_CC  = RLWE (dimension, modulus,         std)
-        self.RLWEp_CC = RLWEp(dimension, modulus,         std, base_gd, self.d_g)
-        self.RGSW_CC  = RGSW (dimension, modulus,         std, base_gd, self.d_g)
+        self.LWE_CC   = LWE  (lwe_dimension, lwe_modulus, s_std, e_std)
+        self.LWEQ_CC  = LWE  (lwe_dimension, modulus,     s_std, e_std)
+        self.RLWE_CC  = RLWE (dimension,     modulus,     s_std, e_std)
+        # self.RLWEp_CC = RLWEp(dimension,     modulus,     std, base_gd, self.d_g)
+        self.RGSW_CC  = RGSW (dimension,     modulus,     s_std, e_std, base_gd, self.d_g)
 
-        self.method   = method
+        if method == 'DM':
+            self.method =   DM(lwe_dimension, lwe_modulus, dimension, modulus, s_std, e_std, base_gd) 
+        elif method== 'CGGI':
+            self.method = CGGI(lwe_dimension, lwe_modulus, dimension, modulus, s_std, e_std, base_gd) 
 
     # -------------------------------- KeyGen ---------------------------- #
-    def dm_keygen(self): # Further impl
+    def keygen(self): # Further impl
         s              = self.LWE_CC.keygen()
         s_ring,pk_ring = self.RLWE_CC.keygen()
-        self.brk       = self.dm_like_rgsw_keygen(s, s_ring)
+
+        self.brk       = self.method.keygen(s, s_ring)
         self.ksk       = self.KSKgen(s, s_ring)
         self.pk        = pk_ring
 
         return s, s_ring
     
-    # def dm_like_rgsw_keygen(self, s:list[int], s_ring:Ring):
-    #     rgsw_keys = []
-    #     for _s in s:
-    #         matrix = []
-    #         for v in range(self.B):
-    #             row = []
-    #             for j in range(self.d_g):
-    #                 coef = np.zeros(self.N)
-    #                 tmp = (v * (self.B**j) * _s) % self.q
-    #                 coef[(self.N//2) - int(tmp)] = 1
-    #                 poly = Ring(self.N, self.Q, coef)
-    #                 row.append(self.RGSW_CC.encrypt(poly, s_ring))
-    #             matrix.append(row)
-    #         rgsw_keys.append(matrix)
-    #     return rgsw_keys
-
-    def dm_like_rgsw_keygen(self, s: list[int], s_ring: Ring):
-        return Parallel(n_jobs=-1)(
-            delayed(generate_rgsw_matrix)(_s, self.B, self.d_g, self.q, self.N, self.Q, self.RGSW_CC, s_ring)
-            for _s in s
-        )
-
     def KSKgen(self, lwe_sk:list[int], rlwe_sk:Ring):
         ksk = []
         for _s in rlwe_sk.coeffs:
@@ -212,25 +170,17 @@ class FHEW:
         else:
             ctxt_operand =  self.LWE_CC.add(ctxt1, ctxt2)
 
-        a,_ = ctxt_operand
         acc = self.acc_init(ctxt_operand, gate)
 
-        # Blind rotation
-        for i, _a in enumerate(a):
-            if(_a == 0):continue
-            for j in range(self.d_g):
-                v = _a % self.B
-                _a = _a // self.B
-
-                acc = self.RGSW_CC.mult_rlwe(acc, self.brk[i][v][j])
+        rotated_acc = self.method.Blindrotation(ctxt_operand, acc, self.brk)
 
         # LWE extraction
-        extracted_lwe = self.LWEextract(acc)
+        extracted_lwe = self.LWEextract(rotated_acc)
 
         # KeySwitch
         key_switched_lwe = self.KeySwitch(extracted_lwe)
 
-        # ModSwitch
+        # ModSwitch # Too many noise so we do not use in toy example
         # mod_switched_lwe = self.ModSwitch(key_switched_lwe)
 
         return key_switched_lwe
@@ -242,6 +192,9 @@ class FHEW:
 
         return (a_, -b_)
     
+
+# ------------------ Mapping Function ------------------ #
+
 def mapping_function(q:int, gate = "AND"):
     assert gate == "AND" or gate == "OR" or gate == "XOR" or gate == "NAND" or gate == "NOR" or gate == "XNOR", "Gate should be one of [AND, OR, XOR, NAND, NOR, XNOR]."
 
